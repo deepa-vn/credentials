@@ -17,34 +17,46 @@ def change_learners_course_run(apps, schema_editor):
     Changing course run id in user grade would fix that issue.
 
     """
-    UserGrade = apps.get_model('records', 'UserGrade')
-    CourseRun = apps.get_model('catalog', 'CourseRun')
 
-    courses = CourseRun.objects.filter(key='course-v1:TUMx+QPLS2x+2T2018')
-    if courses:
-        excluded_run = courses.filter(id=119)
-        included_run = courses.filter(id=8112)
+    excluded_run, included_run = get_course_runs(apps, 119, 8112)
 
-        if excluded_run and included_run:
-            for learner in UserGrade.objects.filter(course_run_id=excluded_run.id):
-                learner.course_run_id = included_run.id
-                learner.saver()
+    if excluded_run and included_run:
+        update_course_run_id(apps, excluded_run, included_run)
 
 
 def reverse_change_learners_course_run(apps, schema_editor):
 
-    UserGrade = apps.get_model('records', 'UserGrade')
+    excluded_run, included_run = get_course_runs(apps, 8112, 119)
+
+    if excluded_run and included_run:
+        update_course_run_id(apps, excluded_run, included_run)
+
+
+def get_course_runs(apps, excluded_run_id, included_run_id):
+    """
+    get excluded and included course runs based on the id
+    """
     CourseRun = apps.get_model('catalog', 'CourseRun')
-
     courses = CourseRun.objects.filter(key='course-v1:TUMx+QPLS2x+2T2018')
+    excluded_run = None
+    included_run = None
     if courses:
-        excluded_run = courses.filter(id=119)
-        included_run = courses.filter(id=8112)
+        excluded_run = courses.filter(id=excluded_run_id)
+        included_run = courses.filter(id=included_run_id)
 
-        if excluded_run and included_run:
-            for learner in UserGrade.objects.filter(course_run_id=included_run.id):
-                learner.course_run_id = excluded_run.id
-                learner.saver()
+    return excluded_run, included_run
+
+
+def update_course_run_id(apps, excluded_run, included_run):
+    """
+    update the learner course run id in grades
+    """
+    UserGrade = apps.get_model('records', 'UserGrade')
+    grades = UserGrade.objects.filter(course_run_id=excluded_run.id)
+    for learner in grades:
+        learner.course_run_id = included_run.id
+
+    UserGrade.objects.bulk_update(grades, ['course_run_id'])
 
 
 class Migration(migrations.Migration):
